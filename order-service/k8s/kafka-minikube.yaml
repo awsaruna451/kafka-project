@@ -1,0 +1,54 @@
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: prod-kafka
+  namespace: kafka
+  annotations:
+    strimzi.io/node-pools: enabled
+    strimzi.io/kraft: enabled
+
+spec:
+  kafka:
+    version: 4.3.1
+    metadataVersion: 4.3-IV0
+
+    listeners:
+      - name: tls                      # existing, keep as is
+        port: 9093
+        type: internal
+        tls: true
+        authentication: { type: scram-sha-512 }
+      - name: external                 # new, same indentation as the line above
+        port: 9094
+        type: nodeport
+        tls: true
+        authentication: { type: scram-sha-512 }
+        configuration:
+          bootstrap:
+            nodePort: 32100
+            alternativeNames: [localhost]
+          brokers:
+            - { broker: 0, nodePort: 32101, advertisedHost: localhost }
+            - { broker: 1, nodePort: 32102, advertisedHost: localhost }
+
+    authorization:
+      type: simple
+
+    config:
+      default.replication.factor: 2
+      min.insync.replicas: 2
+      offsets.topic.replication.factor: 2
+      transaction.state.log.replication.factor: 2
+      transaction.state.log.min.isr: 1
+      auto.create.topics.enable: false
+      unclean.leader.election.enable: false
+      num.partitions: 3
+      log.retention.hours: 24
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef: { name: kafka-metrics, key: kafka-metrics-config.yml }
+
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

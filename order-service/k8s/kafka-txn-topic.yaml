@@ -1,0 +1,29 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: orders-processed
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  partitions: 3
+  replicas: 1
+  config: { min.insync.replicas: 1 }
+
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: order-service
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  authentication: { type: scram-sha-512 }
+  authorization:
+    type: simple
+    acls:
+      - { resource: { type: topic, name: orders }, operations: [ Read, Write, Describe ] }
+      - { resource: { type: group, name: order-service }, operations: [ Read ] }
+      - { resource: { type: topic, name: orders.DLT },       operations: [Write, Describe] }
+      - { resource: { type: topic, name: orders-processed }, operations: [Read, Write, Describe] }
+      - { resource: { type: transactionalId, name: order-tx-, patternType: prefix }, operations: [Describe, Write] }
+      - { resource: { type: group, name: txn-order, patternType: prefix }, operations: [Read] }

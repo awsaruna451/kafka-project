@@ -1,0 +1,40 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: controller
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  replicas: 2
+  roles: [controller]
+  storage:
+    type: jbod
+    volumes:
+      - { id: 0, type: persistent-claim, size: 2Gi, class: standard, kraftMetadata: shared, deleteClaim: true }
+  resources:
+    requests: { cpu: "250m", memory: 512Mi }
+    limits:   { cpu:"500m", memory: 1Gi }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: broker
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  replicas: 2
+  roles: [broker]
+  storage:
+    type: jbod
+    volumes:
+      - { id: 0, type: persistent-claim, size: 5Gi, class: standard, kraftMetadata: shared, deleteClaim: true }
+  resources:
+    requests: { cpu: "500m", memory: 1Gi }
+    limits:   { cpu: "1", memory: 2Gi }
+  jvmOptions:
+    -Xms: 512m
+    -Xmx: 512m
+  template:
+    pod:
+      tolerations:
+        - { key: dedicated, operator: Equal, value: kafka, effect: NoSchedule }

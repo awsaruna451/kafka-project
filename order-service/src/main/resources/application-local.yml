@@ -1,0 +1,10 @@
+# Local run without security:  mvn spring-boot:run -Dspring-boot.run.profiles=local
+spring:
+  kafka:
+    bootstrap-servers: localhost:19092,localhost:19093,localhost:19094
+    properties:
+      security.protocol: PLAINTEXT
+      sasl.mechanism: ""
+      sasl.jaas.config: ""
+      ssl.truststore.type: ""
+      ssl.truststore.location: ""

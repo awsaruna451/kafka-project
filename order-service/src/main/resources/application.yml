@@ -1,0 +1,73 @@
+server:
+  port: 8080
+
+app:
+  kafka:
+    topic: orders
+
+spring:
+  application:
+    name: order-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:32100}
+    template:
+      observation-enabled: true
+
+    producer:
+      acks: all
+      transaction-id-prefix: order-tx-
+      compression-type: lz4
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      batch-size: 32768
+      properties:
+        enable.idempotence: true
+        linger.ms: 10
+        delivery.timeout.ms: 30010
+        spring.json.add.type.headers: false
+
+    consumer:
+      group-id: order-service
+      auto-offset-reset: earliest
+      isolation-level: read_committed
+      enable-auto-commit: false          # Spring commits after the listener returns successfully
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: com.example.kafka.model.OrderEvent
+        spring.json.trusted.packages: com.example.kafka.model
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+
+    listener:
+      ack-mode: record
+      observation-enabled: true
+
+    # Security settings are raw Kafka client properties
+    properties:
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:SASL_SSL}
+      sasl.mechanism: SCRAM-SHA-512
+      sasl.jaas.config: >-
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${KAFKA_USER:order-service}" password="${KAFKA_PASSWORD:XSY7MVWCioBMjx7rlFOUlZHtNGg9FRif}";
+      ssl.truststore.type: PEM
+      ssl.truststore.location: ${KAFKA_CA_PATH:/Users/arunakumara/git/kafka-project/ca.crt}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0

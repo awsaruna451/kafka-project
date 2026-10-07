@@ -1,0 +1,112 @@
+replicaCount: 2
+
+image:
+  repository: aruna451/order-service
+  tag: "latest"                      # use a version tag (e.g. 1.0.0) outside local testing
+  pullPolicy: IfNotPresent           # needed for "minikube image load"
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false      # CHANGED: Spring Boot/Tomcat must write to /tmp
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: order-service.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Kafka connection (maps to the ${KAFKA_*} placeholders in application.yml)
+kafka:
+  bootstrapServers: "prod-kafka-kafka-bootstrap.kafka.svc:9093"
+  securityProtocol: SASL_SSL
+  user: order-service
+  passwordSecret:
+    name: order-service              # created by the Strimzi KafkaUser (same namespace as the release)
+    key: password
+  ca:
+    secretName: prod-kafka-cluster-ca-cert   # created by Strimzi (same namespace as the release)
+    key: ca.crt
+    mountPath: /etc/kafka/certs
+
+# Extra env vars (plain key/value)
+env:
+  SPRING_PROFILES_ACTIVE: prod       # CHANGED: stdout-only logging, no log files
+  OTLP_ENDPOINT: "http://jaeger.monitoring.svc:4318/v1/traces"   # CHANGED: tracing to Jaeger
+  JAVA_TOOL_OPTIONS: "-Duser.timezone=UTC"
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 768Mi              # JVM uses 75% of this (MaxRAMPercentage=75)
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 5
+  liveness:
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 3
+
+terminationGracePeriodSeconds: 40
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 3               # keep <= number of topic partitions (6)
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+metrics:
+  serviceMonitor:
+    enabled: true              # CHANGED: Prometheus Operator CRDs exist on your cluster
+    interval: 15s
+    labels:
+      release: kube-prom-stack # CHANGED: so your Prometheus selects it
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+topologySpreadConstraints:
+  enabled: false               # CHANGED: minikube nodes have no zone labels; enable on EKS
+  maxSkew: 1

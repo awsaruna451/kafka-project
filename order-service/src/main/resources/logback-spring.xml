@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false">
+
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="app"/>
+    <springProperty scope="context" name="LOG_DIR"  source="logging.file.path"      defaultValue="logs"/>
+
+    <!-- traceId/spanId are filled into the MDC by Micrometer Tracing -->
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} | %-5level | ${APP_NAME} | %X{traceId:-} | %X{spanId:-} | %thread | %logger{36} | %msg%n%throwable"/>
+
+    <property name="LOG_PATTERN_COLOR"
+              value="%d{HH:mm:ss.SSS} | %highlight(%-5level) | ${APP_NAME} | %X{traceId:-} | %X{spanId:-} | %thread | %cyan(%logger{36}) | %msg%n%throwable"/>
+
+    <!-- Colored console for local development -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder><pattern>${LOG_PATTERN_COLOR}</pattern></encoder>
+    </appender>
+
+    <!-- Plain console for containers and Kubernetes (stdout is collected by the platform) -->
+    <appender name="CONSOLE_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder><pattern>${LOG_PATTERN}</pattern></encoder>
+    </appender>
+
+    <!-- IntelliJ with no profile, or "dev": console only -->
+    <springProfile name="default,dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.example" level="DEBUG"/>
+    </springProfile>
+
+    <!-- "local" profile: console + log file on your Mac (the file appender lives ONLY here) -->
+    <springProfile name="local">
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_DIR}/${APP_NAME}.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_DIR}/${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxFileSize>50MB</maxFileSize>
+                <maxHistory>7</maxHistory>
+                <totalSizeCap>1GB</totalSizeCap>
+            </rollingPolicy>
+            <encoder><pattern>${LOG_PATTERN}</pattern></encoder>
+        </appender>
+        <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+            <queueSize>1024</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <neverBlock>true</neverBlock>
+            <appender-ref ref="FILE"/>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+        <logger name="com.example" level="DEBUG"/>
+    </springProfile>
+
+    <!-- Everything else (Docker, Kubernetes, prod): plain stdout only, no files -->
+    <springProfile name="!default &amp; !dev &amp; !local">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_PLAIN"/>
+        </root>
+        <logger name="com.example" level="INFO"/>
+    </springProfile>
+
+    <!-- Noise control -->
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="org.springframework.kafka" level="INFO"/>
+
+</configuration>

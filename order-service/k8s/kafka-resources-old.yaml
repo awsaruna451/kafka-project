@@ -1,0 +1,39 @@
+# Apply these to the Strimzi cluster namespace (kafka). Topics must exist: auto-create is disabled.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: orders
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  partitions: 6
+  replicas: 3
+  config: { retention.ms: 604800000, min.insync.replicas: 2 }
+---
+# Dead-letter topic. Needs at least as many partitions as "orders".
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: orders-dlt
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  topicName: orders.DLT
+  partitions: 6
+  replicas: 3
+  config: { retention.ms: 1209600000, min.insync.replicas: 2 }
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: order-service
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  authentication: { type: scram-sha-512 }
+  authorization:
+    type: simple
+    acls:
+      - { resource: { type: topic, name: orders },     operations: [Read, Write, Describe] }
+      - { resource: { type: topic, name: orders.DLT }, operations: [Write, Describe] }
+      - { resource: { type: group, name: order-service }, operations: [Read] }
