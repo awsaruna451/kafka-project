@@ -20,7 +20,6 @@ public class OrderConsumer {
                         @Header(KafkaHeaders.OFFSET) long offset) throws InterruptedException {
         log.info("Received order {} (customer={}, amount={}) from partition {} offset {}",
                 event.orderId(), event.customerId(), event.amount(), partition, offset);
-        Thread.sleep(15000);
 
         // Make this idempotent: delivery is at-least-once, so the same order may arrive twice.
         // If this method throws, the error handler retries, then sends the record to the DLT.

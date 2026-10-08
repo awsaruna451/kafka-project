@@ -14,14 +14,13 @@ spring:
       observation-enabled: true
 
     producer:
-      acks: all
-      transaction-id-prefix: order-tx-
+      acks: 0
       compression-type: lz4
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       batch-size: 32768
       properties:
-        enable.idempotence: true
+        enable.idempotence: false
         linger.ms: 10
         delivery.timeout.ms: 30010
         spring.json.add.type.headers: false
@@ -29,7 +28,6 @@ spring:
     consumer:
       group-id: order-service
       auto-offset-reset: earliest
-      isolation-level: read_committed
       enable-auto-commit: false          # Spring commits after the listener returns successfully
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
