@@ -45,10 +45,23 @@ spec:
       num.partitions: 3
       log.retention.hours: 24
     metricsConfig:
-      type: jmxPrometheusExporter
-      valueFrom:
-        configMapKeyRef: { name: kafka-metrics, key: kafka-metrics-config.yml }
-
+      type: strimziMetricsReporter    # no ConfigMap needed
+      values:
+        allowList:
+          - "kafka_log.*"
+          - "kafka_network.*"
+          - "kafka_server.*"
+          - "kafka_controller.*"
   entityOperator:
     topicOperator: {}
     userOperator: {}
+  kafkaExporter:
+    topicRegex: "orders.*"
+    groupRegex: "order-service.*"
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits:   { memory: 256Mi }
+  cruiseControl:
+    resources:
+      requests: { cpu: 100m, memory: 512Mi }
+      limits:   { memory: 1Gi }

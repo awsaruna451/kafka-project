@@ -23,7 +23,7 @@ public class OrderConsumer {
 
         // Make this idempotent: delivery is at-least-once, so the same order may arrive twice.
         // If this method throws, the error handler retries, then sends the record to the DLT.
-        if (event.amount() < 0) {
+        if (event.amount() < 50) {
             throw new IllegalArgumentException("Invalid amount for order " + event.orderId());
         }
     }

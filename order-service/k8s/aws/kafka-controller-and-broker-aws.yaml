@@ -1,0 +1,71 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: controller
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  replicas: 3
+  roles: [controller]
+  storage:
+    type: jbod
+    volumes:
+      - { id: 0, type: persistent-claim, size: 5Gi, class: gp3-kafka, kraftMetadata: shared, deleteClaim: true }
+  resources:
+    requests: { cpu: "250m", memory: 512Mi }
+    limits:   { memory: 768Mi }
+  jvmOptions:
+    "-Xms": 256m
+    "-Xmx": 256m
+  template:
+    pod:
+      tolerations:
+        - { key: dedicated, operator: Equal, value: kafka, effect: NoSchedule }
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - { key: workload, operator: In, values: [kafka] }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels: { strimzi.io/pool-name: controller }
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: broker
+  namespace: kafka
+  labels: { strimzi.io/cluster: prod-kafka }
+spec:
+  replicas: 3
+  roles: [broker]
+  storage:
+    type: jbod
+    volumes:
+      - { id: 0, type: persistent-claim, size: 10Gi, class: gp3-kafka, kraftMetadata: shared, deleteClaim: true }
+  resources:
+    requests: { cpu: "500m", memory: 1Gi }
+    limits:   { memory: 1536Mi }
+  jvmOptions:
+    "-Xms": 512m
+    "-Xmx": 512m
+  template:
+    pod:
+      tolerations:
+        - { key: dedicated, operator: Equal, value: kafka, effect: NoSchedule }
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - { key: workload, operator: In, values: [kafka] }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels: { strimzi.io/pool-name: broker }

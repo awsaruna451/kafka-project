@@ -1,0 +1,50 @@
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: prod-kafka
+  namespace: kafka
+spec:
+  kafka:
+    # version / metadataVersion: omit to use the operator default, or pin a supported one
+    rack:
+      topologyKey: topology.kubernetes.io/zone
+    listeners:
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+        authentication:
+          type: scram-sha-512
+    authorization:                    # moved out of the listener
+      type: simple
+    config:
+      default.replication.factor: 3
+      min.insync.replicas: 2
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      auto.create.topics.enable: false
+      unclean.leader.election.enable: false
+      num.partitions: 3
+      log.retention.hours: 168
+    metricsConfig:
+      type: strimziMetricsReporter    # no ConfigMap needed
+      values:
+        allowList:
+          - "kafka_log.*"
+          - "kafka_network.*"
+          - "kafka_server.*"
+          - "kafka_controller.*"
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+  kafkaExporter:
+    topicRegex: "orders.*"
+    groupRegex: "order-service.*"
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits:   { memory: 256Mi }
+  cruiseControl:
+    resources:
+      requests: { cpu: 100m, memory: 512Mi }
+      limits:   { memory: 1Gi }

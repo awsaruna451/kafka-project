@@ -4,32 +4,65 @@
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="app"/>
     <springProperty scope="context" name="LOG_DIR"  source="logging.file.path"      defaultValue="logs"/>
 
-    <!-- traceId/spanId are filled into the MDC by Micrometer Tracing -->
-    <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} | %-5level | ${APP_NAME} | %X{traceId:-} | %X{spanId:-} | %thread | %logger{36} | %msg%n%throwable"/>
+    <!--
+      JSON logging for ALL profiles (default, dev, local, k8s, prod ...).
+      One JSON object per line; stack traces are a single escaped string, so exceptions are never
+      split across documents.
 
-    <property name="LOG_PATTERN_COLOR"
-              value="%d{HH:mm:ss.SSS} | %highlight(%-5level) | ${APP_NAME} | %X{traceId:-} | %X{spanId:-} | %thread | %cyan(%logger{36}) | %msg%n%throwable"/>
+      Field names match the log-mcp-server defaults and avoid ECS object collisions in the
+      filebeat-* template (hence "app_name", not "service"):
+        @timestamp, level, app_name, git_sha, trace_id, span_id, thread, logger,
+        message, exception_class, stack_trace
 
-    <!-- Colored console for local development -->
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder><pattern>${LOG_PATTERN_COLOR}</pattern></encoder>
+      GIT_SHA is read from the environment (set it in the Deployment); defaults to "unknown".
+      traceId/spanId are filled into the MDC by Micrometer Tracing.
+    -->
+
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <fieldName>@timestamp</fieldName>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+                <pattern>
+                    <pattern>{"app_name":"${APP_NAME}","git_sha":"${GIT_SHA:-unknown}"}</pattern>
+                </pattern>
+                <mdc>
+                    <includeMdcKeyName>traceId</includeMdcKeyName>
+                    <includeMdcKeyName>spanId</includeMdcKeyName>
+                    <mdcKeyFieldName>traceId=trace_id</mdcKeyFieldName>
+                    <mdcKeyFieldName>spanId=span_id</mdcKeyFieldName>
+                </mdc>
+                <threadName>
+                    <fieldName>thread</fieldName>
+                </threadName>
+                <loggerName>
+                    <fieldName>logger</fieldName>
+                    <shortenedLoggerNameLength>36</shortenedLoggerNameLength>
+                </loggerName>
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+                <throwableClassName>
+                    <fieldName>exception_class</fieldName>
+                </throwableClassName>
+                <stackTrace>
+                    <fieldName>stack_trace</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>4000</maxLength>
+                        <rootCauseFirst>true</rootCauseFirst>
+                    </throwableConverter>
+                </stackTrace>
+            </providers>
+        </encoder>
     </appender>
 
-    <!-- Plain console for containers and Kubernetes (stdout is collected by the platform) -->
-    <appender name="CONSOLE_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder><pattern>${LOG_PATTERN}</pattern></encoder>
-    </appender>
-
-    <!-- IntelliJ with no profile, or "dev": console only -->
-    <springProfile name="default,dev">
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-        </root>
-        <logger name="com.example" level="DEBUG"/>
-    </springProfile>
-
-    <!-- "local" profile: console + log file on your Mac (the file appender lives ONLY here) -->
+    <!-- "local" profile: JSON on the console AND in a rolling file on your Mac (file appender lives ONLY here) -->
     <springProfile name="local">
         <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>${LOG_DIR}/${APP_NAME}.log</file>
@@ -39,7 +72,47 @@
                 <maxHistory>7</maxHistory>
                 <totalSizeCap>1GB</totalSizeCap>
             </rollingPolicy>
-            <encoder><pattern>${LOG_PATTERN}</pattern></encoder>
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp>
+                        <fieldName>@timestamp</fieldName>
+                        <timeZone>UTC</timeZone>
+                    </timestamp>
+                    <logLevel>
+                        <fieldName>level</fieldName>
+                    </logLevel>
+                    <pattern>
+                        <pattern>{"app_name":"${APP_NAME}","git_sha":"${GIT_SHA:-unknown}"}</pattern>
+                    </pattern>
+                    <mdc>
+                        <includeMdcKeyName>traceId</includeMdcKeyName>
+                        <includeMdcKeyName>spanId</includeMdcKeyName>
+                        <mdcKeyFieldName>traceId=trace_id</mdcKeyFieldName>
+                        <mdcKeyFieldName>spanId=span_id</mdcKeyFieldName>
+                    </mdc>
+                    <threadName>
+                        <fieldName>thread</fieldName>
+                    </threadName>
+                    <loggerName>
+                        <fieldName>logger</fieldName>
+                        <shortenedLoggerNameLength>36</shortenedLoggerNameLength>
+                    </loggerName>
+                    <message>
+                        <fieldName>message</fieldName>
+                    </message>
+                    <throwableClassName>
+                        <fieldName>exception_class</fieldName>
+                    </throwableClassName>
+                    <stackTrace>
+                        <fieldName>stack_trace</fieldName>
+                        <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                            <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                            <maxLength>4000</maxLength>
+                            <rootCauseFirst>true</rootCauseFirst>
+                        </throwableConverter>
+                    </stackTrace>
+                </providers>
+            </encoder>
         </appender>
         <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
             <queueSize>1024</queueSize>
@@ -48,17 +121,23 @@
             <appender-ref ref="FILE"/>
         </appender>
         <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="CONSOLE_JSON"/>
             <appender-ref ref="ASYNC_FILE"/>
         </root>
-        <logger name="com.example" level="DEBUG"/>
     </springProfile>
 
-    <!-- Everything else (Docker, Kubernetes, prod): plain stdout only, no files -->
-    <springProfile name="!default &amp; !dev &amp; !local">
+    <!-- Every other profile (default, dev, k8s, prod ...): JSON on stdout only, no files -->
+    <springProfile name="!local">
         <root level="INFO">
-            <appender-ref ref="CONSOLE_PLAIN"/>
+            <appender-ref ref="CONSOLE_JSON"/>
         </root>
+    </springProfile>
+
+    <!-- App log level: DEBUG on your machine, INFO everywhere else -->
+    <springProfile name="default,dev,local">
+        <logger name="com.example" level="DEBUG"/>
+    </springProfile>
+    <springProfile name="!default &amp; !dev &amp; !local">
         <logger name="com.example" level="INFO"/>
     </springProfile>
 
