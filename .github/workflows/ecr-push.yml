@@ -4,7 +4,6 @@ on:
   push:
     branches: [dev]  # must match var.github_branch in the trust policy
   workflow_dispatch:
-
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: order-service
