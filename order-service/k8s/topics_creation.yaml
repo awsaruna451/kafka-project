@@ -27,6 +27,18 @@ spec:
       - { resource: { type: group, name: txn-order, patternType: prefix },   operations: [Read] }
       - { resource: { type: group, name: order-service-dlt },                operations: [Read] }   # exact name
       - { resource: { type: transactionalId, name: order-tx-, patternType: prefix }, operations: [Describe, Write] }
+      - { resource: { type: topic, name: order.commands },        operations: [Read, Write, Describe ] }
+      - { resource: { type: topic, name: payment.commands },      operations: [ Read,Write, Describe ] }
+      - { resource: { type: topic, name: notification.commands }, operations: [ Read,Write, Describe ] }
+        # consumes replies
+      - { resource: { type: topic, name: order.replies },         operations: [ Write,Read, Describe ] }
+      - { resource: { type: topic, name: payment.replies },       operations: [ Write,Read, Describe ] }
+        # dead-letter topics for replies it fails to process
+      - { resource: { type: topic, name: order.replies.DLT },     operations: [ Write, Describe ] }
+      - { resource: { type: topic, name: payment.replies.DLT },   operations: [ Write, Describe ] }
+      - { resource: { type: group, name: orchestrator-service },  operations: [ Read ] }
+      - { resource: { type: group, name: notification-service },  operations: [ Read ] }
+      - { resource: { type: group, name: payment-service },  operations: [ Read ] }
 ---
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
