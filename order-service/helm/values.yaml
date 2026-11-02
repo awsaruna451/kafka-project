@@ -62,7 +62,7 @@ kafka:
 
 # Extra env vars (plain key/value)
 env:
-  SPRING_PROFILES_ACTIVE: prod       # CHANGED: stdout-only logging, no log files
+  SPRING_PROFILES_ACTIVE: dev       # CHANGED: stdout-only logging, no log files
   OTLP_ENDPOINT: "http://jaeger.monitoring.svc:4318/v1/traces"   # CHANGED: tracing to Jaeger
   JAVA_TOOL_OPTIONS: "-Duser.timezone=UTC"
 
@@ -90,7 +90,7 @@ autoscaling:
   enabled: false
   minReplicas: 2
   maxReplicas: 3               # keep <= number of topic partitions (6)
-  targetCPUUtilizationPercentage: 70
+  targetCPUUtilizationPercentage: 8
 
 pdb:
   enabled: true
