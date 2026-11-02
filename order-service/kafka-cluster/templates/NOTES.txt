@@ -1,0 +1,10 @@
+Kafka cluster "{{ .Values.clusterName }}" submitted to namespace {{ .Release.Namespace }}.
+
+Prerequisite: the Strimzi operator must already be installed and watching this namespace.
+
+Watch it come up:
+  kubectl get kafka,kafkanodepool,kafkatopic,kafkauser -n {{ .Release.Namespace }}
+  kubectl wait kafka/{{ .Values.clusterName }} -n {{ .Release.Namespace }} --for=condition=Ready --timeout=600s
+
+Client bootstrap (in-cluster, TLS + SCRAM): {{ .Values.clusterName }}-kafka-bootstrap.{{ .Release.Namespace }}.svc:9093
+Client credentials live in the Secret named after each KafkaUser.

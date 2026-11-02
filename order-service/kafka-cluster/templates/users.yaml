@@ -1,0 +1,19 @@
+{{- range .Values.users }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    strimzi.io/cluster: {{ $.Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  authentication:
+    {{- toYaml .authentication | nindent 4 }}
+  {{- with .authorization }}
+  authorization:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

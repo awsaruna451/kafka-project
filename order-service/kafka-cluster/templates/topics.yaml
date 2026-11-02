@@ -1,0 +1,22 @@
+{{- range .Values.topics }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    strimzi.io/cluster: {{ $.Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  {{- with .topicName }}
+  topicName: {{ . }}
+  {{- end }}
+  partitions: {{ .partitions }}
+  replicas: {{ .replicas }}
+  {{- with .config }}
+  config:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

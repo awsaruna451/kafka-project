@@ -1,0 +1,40 @@
+{{- if .Values.monitoring.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kafka-resources-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: strimzi
+    {{- toYaml .Values.monitoring.podMonitor.labels | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchExpressions:
+      - key: strimzi.io/kind
+        operator: In
+        values: [Kafka, KafkaConnect, KafkaMirrorMaker2]
+  podMetricsEndpoints:
+    - port: tcp-prometheus
+      path: /metrics
+      interval: {{ .Values.monitoring.podMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.podMonitor.scrapeTimeout }}
+      relabelings:
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(strimzi_io_.+)
+          replacement: $1
+          separator: ""
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: kubernetes_pod_name
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node_name
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_host_ip]
+          targetLabel: node_ip
+{{- end }}

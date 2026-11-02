@@ -1,0 +1,160 @@
+# Name of the Kafka cluster. Node pools, topics and users attach to it via the
+# strimzi.io/cluster label. The namespace is taken from the Helm release / ArgoCD destination.
+clusterName: prod-kafka
+
+storageClass:
+  create: true
+  name: gp3-kafka
+  type: gp3
+  encrypted: true
+  reclaimPolicy: Delete        # lab; use Retain in production
+  volumeBindingMode: WaitForFirstConsumer
+  allowVolumeExpansion: true
+
+# Applied to every node pool
+scheduling:
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: kafka
+      effect: NoSchedule
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: workload
+              operator: In
+              values: [kafka]
+  zoneSpread:
+    enabled: true
+    maxSkew: 1
+    whenUnsatisfiable: DoNotSchedule
+
+nodePools:
+  controller:
+    replicas: 3
+    roles: [controller]
+    storage:
+      size: 5Gi
+      deleteClaim: true        # PVCs removed when the cluster is deleted
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { memory: 768Mi }
+    jvmOptions:
+      "-Xms": 256m
+      "-Xmx": 256m
+  broker:
+    replicas: 3
+    roles: [broker]
+    storage:
+      size: 10Gi
+      deleteClaim: true
+    resources:
+      requests: { cpu: 500m, memory: 1Gi }
+      limits: { memory: 1536Mi }
+    jvmOptions:
+      "-Xms": 512m
+      "-Xmx": 512m
+
+kafka:
+  version: ""                  # empty = operator default; or pin a supported version
+  rack:
+    topologyKey: topology.kubernetes.io/zone
+  listeners:
+    - name: tls
+      port: 9093
+      type: internal
+      tls: true
+      authentication:
+        type: scram-sha-512
+  authorization:
+    type: simple
+  config:
+    default.replication.factor: 3
+    min.insync.replicas: 2
+    offsets.topic.replication.factor: 3
+    transaction.state.log.replication.factor: 3
+    transaction.state.log.min.isr: 2
+    auto.create.topics.enable: false
+    unclean.leader.election.enable: false
+    num.partitions: 3
+    log.retention.hours: 168
+  metrics:
+    enabled: true              # Strimzi Metrics Reporter, no ConfigMap needed
+    allowList:
+      - "kafka_log.*"
+      - "kafka_network.*"
+      - "kafka_server.*"
+      - "kafka_controller.*"
+
+kafkaExporter:
+  enabled: true
+  topicRegex: "orders.*"
+  groupRegex: "order-service.*"
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+cruiseControl:
+  enabled: true
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { memory: 1Gi }
+
+# The JMX-exporter style ConfigMap from kafka-metrics.yaml. The Kafka resource above uses the
+# Strimzi Metrics Reporter and does not reference it, so it is off by default.
+metricsConfigMap:
+  enabled: false
+  name: kafka-metrics
+
+# Needs the Prometheus Operator CRDs (kube-prometheus-stack) to be installed first
+monitoring:
+  podMonitor:
+    enabled: true
+    labels:
+      release: kube-prom-stack  # must match Prometheus' podMonitorSelector
+    interval: 30s
+    scrapeTimeout: 10s
+
+topics:
+  - name: orders
+    partitions: 3
+    replicas: 3                # was 1 in the original file, see README note
+    config:
+      retention.ms: 604800000
+      min.insync.replicas: 2
+  - name: orders-dlt
+    topicName: orders.DLT
+    partitions: 3
+    replicas: 3
+    config:
+      retention.ms: 1209600000
+      min.insync.replicas: 2
+  # The order-service ACLs mention this topic, but auto-create is off, so create it if the app uses it:
+  # - name: orders-processed
+  #   partitions: 3
+  #   replicas: 3
+  #   config:
+  #     min.insync.replicas: 2
+
+users:
+  - name: order-service
+    authentication:
+      type: scram-sha-512
+    authorization:
+      type: simple
+      acls:
+        - resource: { type: topic, name: orders }
+          operations: [Read, Write, Describe]
+        - resource: { type: topic, name: orders-processed }
+          operations: [Read, Write, Describe]
+        - resource: { type: topic, name: orders.DLT }
+          operations: [Read, Write, Describe]
+        - resource: { type: group, name: order-service }
+          operations: [Read]
+        - resource: { type: group, name: txn-order, patternType: prefix }
+          operations: [Read]
+        - resource: { type: group, name: order-service-dlt }
+          operations: [Read]
+        - resource: { type: transactionalId, name: order-tx-, patternType: prefix }
+          operations: [Describe, Write]

@@ -1,0 +1,12 @@
+{{- if .Values.metricsConfigMap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.metricsConfigMap.name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  kafka-metrics-config.yml: |
+{{ .Files.Get "files/kafka-metrics-config.yml" | indent 4 }}
+{{- end }}

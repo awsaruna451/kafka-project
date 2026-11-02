@@ -1,0 +1,49 @@
+{{- range $name, $pool := .Values.nodePools }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    strimzi.io/cluster: {{ $.Values.clusterName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: {{ $pool.replicas }}
+  roles:
+    {{- toYaml $pool.roles | nindent 4 }}
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: {{ $pool.storage.size }}
+        class: {{ $.Values.storageClass.name }}
+        kraftMetadata: shared
+        deleteClaim: {{ $pool.storage.deleteClaim }}
+  resources:
+    {{- toYaml $pool.resources | nindent 4 }}
+  jvmOptions:
+    {{- toYaml $pool.jvmOptions | nindent 4 }}
+  template:
+    pod:
+      {{- with $.Values.scheduling.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.scheduling.nodeAffinity }}
+      affinity:
+        nodeAffinity:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
+      {{- if $.Values.scheduling.zoneSpread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ $.Values.scheduling.zoneSpread.maxSkew }}
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: {{ $.Values.scheduling.zoneSpread.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              strimzi.io/pool-name: {{ $name }}
+      {{- end }}
+{{- end }}

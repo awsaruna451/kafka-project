@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kafka-cluster
+description: Strimzi Kafka cluster (KRaft, controller + broker node pools on EBS gp3) with topics, users and a Prometheus PodMonitor
+type: application
+version: 0.1.0
+appVersion: "1.2.0" # Strimzi operator version this chart was written against
