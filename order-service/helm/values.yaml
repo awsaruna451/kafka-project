@@ -1,8 +1,8 @@
 replicaCount: 2
 
 image:
-  repository: aruna451/order-service
-  tag: "1.0.0"                      # use a version tag (e.g. 1.0.0) outside local testing
+  repository: 324037296112.dkr.ecr.us-east-1.amazonaws.com/order-service
+  tag: "latest"                      # use a version tag (e.g. 1.0.0) outside local testing
   pullPolicy: IfNotPresent           # needed for "minikube image load"
 imagePullSecrets: []
 
