@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: order-service
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/awsaruna451/kafka-project.git
+    targetRevision: dev
+    path: order-service/helm            # folder containing Chart.yaml
+    helm:
+      releaseName: order-service
+      valuesObject:
+        image:
+          repository: 324037296112.dkr.ecr.us-east-1.amazonaws.com/order-service
+          tag: "latest"                 # or a commit SHA pushed by the workflow
+          pullPolicy: Always
+        kafka:
+          bootstrapServers: prod-kafka-kafka-bootstrap.kafka.svc:9093
+          securityProtocol: SASL_SSL    # TLS listener + SCRAM-SHA-512 user
+          user: order-service
+          passwordSecret:
+            name: order-service         # Secret created by the KafkaUser
+            key: password
+          ca:
+            secretName: prod-kafka-cluster-ca-cert   # Secret created by Strimzi
+            key: ca.crt
+            mountPath: /etc/kafka/ca
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka                    # same namespace as the Kafka secrets (see notes)
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

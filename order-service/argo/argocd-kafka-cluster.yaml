@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-cluster
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io   # deleting the app also deletes its resources
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/awsaruna451/kafka-project.git
+    targetRevision: dev
+    path: order-service/kafka-cluster/   # folder containing Chart.yaml
+    helm:
+      releaseName: kafka-cluster
+      # Override chart values here instead of editing values.yaml, for example:
+      # valuesObject:
+      #   monitoring:
+      #     podMonitor:
+      #       enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m
